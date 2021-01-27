@@ -1,0 +1,107 @@
+service: serverlessproject
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-east-1
+  environment:
+    tableName: ${self:custom.tableName}
+    bucketName: ${self:custom.bucketName}
+  lambdaHashingVersion: 20201221
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+        - s3:*
+      Resource: '*'
+  apiKeys:
+    - free:
+        - MyFreeAPIKey
+    # - paid:
+    #     - MyPaidAPIKey
+  usagePlan:
+    - free:
+        quota: # after 100 requests per month, it won't work
+          limit: 100
+          period: MONTH
+        throttle: # 5 requests per second and it can go upto 10
+          rateLimit: 5
+          burstLimit: 10
+    # - paid:
+    #     quota:
+    #       limit: 1000
+    #       period: MONTH
+    #     throttle:
+    #       rateLimit: 10
+    #       burstLimit: 50
+
+plugins:
+  - serverless-s3-sync
+
+custom:
+  tableName: player-score
+  bucketName: serverlessprojectuploadbucket-111
+  s3Sync:
+    - bucketName: ${self:custom.bucketName}
+      localDir: UploadData
+
+functions:
+  getUser:
+    handler: lambdas/endpoints/getUser.handler
+    events:
+      - http:
+          path: get-user/{ID}
+          method: GET
+          cors: true
+  getPlayerScore:
+    handler: lambdas/endpoints/getPlayerScore.handler
+    events:
+      - http:
+          path: get-player-score/{ID}
+          method: GET
+          cors: true
+          private: true
+  createPlayerScore:
+    handler: lambdas/endpoints/createPlayerScore.handler
+    events:
+      - http:
+          path: create-player-score/{ID}
+          method: POST
+          cors: true
+          private: true
+  getFile:
+    handler: lambdas/endpoints/getFile.handler
+    events:
+      - http:
+          path: get-file/{fileName}
+          method: GET
+          cors: true
+          private: true
+  createFile:
+    handler: lambdas/endpoints/createFile.handler
+    events:
+      - http:
+          path: create-file/{fileName}
+          method: POST
+          cors: true
+          private: true
+
+resources:
+  Resources:
+    DemoBucketUpload:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+    MyDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
